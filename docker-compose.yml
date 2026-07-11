@@ -1,0 +1,45 @@
+# backend/docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: admito_db
+    environment:
+      POSTGRES_USER: admito_user
+      POSTGRES_PASSWORD: admito_pass
+      POSTGRES_DB: admito_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admito_user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: admito_backend
+    environment:
+      DATABASE_URL: postgresql://admito_user:Pytha1991@db:5432/admito_db
+      JWT_SECRET_KEY: votre_secret_jwt
+      GENIUS_PAY_API_KEY: pk_test_...
+      GENIUS_PAY_API_SECRET: sk_test_...
+      GENIUS_PAY_WEBHOOK_SECRET: whsec_...
+      GENIUS_PAY_CALLBACK_URL: http://localhost:5000/api/payment/webhook
+      GENIUS_PAY_REDIRECT_URL: http://localhost:5000/api/payment/redirect
+      PAYPAL_CLIENT_ID: votre_client_id
+      PAYPAL_CLIENT_SECRET: votre_client_secret
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: python app.py
+
+volumes:
+  postgres_data:
