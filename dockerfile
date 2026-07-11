@@ -1,6 +1,7 @@
-FROM python:3.11-slim
+# Dockerfile
+FROM python:3.13-slim
 
-# Installer les dépendances système
+# Installer les dépendances système nécessaires pour psycopg2
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
@@ -17,11 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copier le code source
 COPY . .
 
-# Créer le script d'entrée
-RUN echo '#!/bin/bash\n\
-    echo "Starting Gunicorn..."\n\
-    gunicorn --bind 0.0.0.0:$PORT --timeout 120 --workers 2 app:app' > entrypoint.sh && chmod +x entrypoint.sh
-
+# Exposer le port
 EXPOSE 5000
 
-ENTRYPOINT ["./entrypoint.sh"]
+# Lancer l'application avec Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--timeout", "120", "--workers", "2", "app:app"]
