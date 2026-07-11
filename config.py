@@ -7,7 +7,7 @@ class Config:
     # Base de données PostgreSQL
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL",
-        "postgresql://admito_user:admito_pass@localhost:5432/admito_db"
+        "postgresql://admito_user:Pytha1991@localhost:5432/admito_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
