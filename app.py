@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -129,7 +130,7 @@ def get_offer(offer_id):
 
 
 # ---------------------------------------------------------------------------
-# ADMINISTRATION DES OFFRES (proteges par un login admin email/mot de passe)
+# ADMINISTRATION DES OFFRES
 # ---------------------------------------------------------------------------
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
@@ -168,7 +169,7 @@ def create_offer():
     offer = Offer(
         title=data["title"],
         organization=data["organization"],
-        category=data["category"],  # "bourse" / "admission" / "travail"
+        category=data["category"],
         country=data.get("country"),
         description=data.get("description"),
         how_to_apply=data.get("how_to_apply"),
@@ -184,7 +185,6 @@ def create_offer():
 @app.route("/api/admin/offers", methods=["GET"])
 @require_admin
 def admin_list_offers():
-    """Liste complete des offres pour l'ecran d'administration (aucun filtre)."""
     offers = Offer.query.order_by(Offer.created_at.desc()).all()
     return jsonify([o.to_dict() for o in offers])
 
@@ -223,7 +223,7 @@ def delete_offer(offer_id):
 
 
 # ---------------------------------------------------------------------------
-# PORTEFEUILLE (applications sauvegardees par l'utilisateur)
+# PORTEFEUILLE
 # ---------------------------------------------------------------------------
 @app.route("/api/wallet", methods=["GET"])
 @jwt_required()
@@ -279,7 +279,7 @@ def remove_from_wallet(application_id):
 
 
 # ---------------------------------------------------------------------------
-# ABONNEMENT / PAIEMENT (Genius Pay + PayPal)
+# ABONNEMENT / PAIEMENT
 # ---------------------------------------------------------------------------
 @app.route("/api/subscription", methods=["GET"])
 @jwt_required()
@@ -296,11 +296,6 @@ def pay_with_genius_pay():
     user = User.query.get_or_404(user_id)
     sub = Subscription.query.filter_by(user_id=user_id).first()
 
-    # Genius Pay convertit automatiquement les devises : on peut envoyer
-    # directement en EUR (devise officielle du prix de l'abonnement), ou en
-    # XOF/USD si le client le demande explicitement. Les autres devises
-    # locales (XAF, CDF...) passent par le choix du moyen de paiement sur
-    # leur page de checkout, pas par ce champ "currency" global.
     data = request.get_json(silent=True) or {}
     currency = data.get("currency", "EUR").upper()
     if currency not in ("EUR", "USD", "XOF"):
@@ -323,18 +318,11 @@ def pay_with_genius_pay():
 @app.route("/api/subscription/confirm/genius-pay", methods=["POST"])
 @jwt_required()
 def confirm_genius_pay():
-    """
-    Fallback : appele par l'app juste apres que l'utilisateur revient de
-    Genius Pay, pour donner un retour immediat dans l'UI. La confirmation
-    OFFICIELLE et fiable reste le webhook (voir /api/payment/webhook
-    plus bas), qui est la seule source qu'on ne peut pas falsifier.
-    """
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
     sub = Subscription.query.filter_by(user_id=user_id).first()
 
     if sub.is_active:
-        # Deja active (probablement via le webhook, arrive avant ce fallback)
         return jsonify({"message": "Abonnement deja actif", "subscription": sub.to_dict()})
 
     if payments.verify_genius_pay_payment(Config, sub.provider_reference):
@@ -346,16 +334,6 @@ def confirm_genius_pay():
 
 @app.route("/api/payment/webhook", methods=["POST"])
 def genius_pay_webhook():
-    """
-    Endpoint appele directement par les serveurs de Genius Pay des qu'un
-    evenement de paiement se produit (payment.success, payment.failed, ...).
-    C'est la source de verite : c'est ici, et seulement ici, qu'on doit se
-    fier pour activer un compte, car cet appel vient serveur a serveur et
-    est signe avec le secret webhook.
-
-    A enregistrer une seule fois aupres de Genius Pay via register_webhook.py
-    (voir README) avec l'URL : GENIUS_PAY_CALLBACK_URL
-    """
     raw_body = request.get_data()
     signature = request.headers.get("X-Webhook-Signature", "")
     timestamp = request.headers.get("X-Webhook-Timestamp", "")
@@ -379,19 +357,11 @@ def genius_pay_webhook():
         user = User.query.get(sub.user_id)
         _activate_subscription(user, sub)
 
-    # On repond toujours 200 pour accuser reception (evite les re-envois
-    # en boucle par Genius Pay), meme si le statut est un echec.
     return jsonify({"received": True}), 200
 
 
 @app.route("/api/payment/redirect", methods=["GET"])
 def payment_redirect():
-    """
-    Page affichee au client dans son navigateur juste apres avoir paye (ou
-    annule) sur Genius Pay. L'activation reelle du compte se fait via le
-    webhook, pas ici : cette page ne sert qu'a informer le client qu'il peut
-    revenir sur l'application.
-    """
     result = request.args.get("result", "success")
     if result == "success":
         message = "Paiement recu ! Ton abonnement Admi.To sera actif dans quelques instants. Tu peux revenir sur l'application."
@@ -410,7 +380,6 @@ def payment_redirect():
 
 
 def _activate_subscription(user, sub):
-    """Active l'abonnement premium ET fait passer le compte utilisateur a 'active'."""
     sub.is_active = True
     sub.started_at = datetime.utcnow()
     sub.current_period_end = payments.compute_next_period_end()
@@ -435,7 +404,6 @@ def pay_with_paypal():
 @app.route("/api/subscription/confirm/paypal", methods=["POST"])
 @jwt_required()
 def confirm_paypal():
-    """Appele apres que l'utilisateur ait approuve le paiement dans l'app PayPal."""
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
     sub = Subscription.query.filter_by(user_id=user_id).first()
@@ -453,7 +421,18 @@ def health():
     return jsonify({"status": "ok", "app": "Admi.To API"})
 
 
+# ---------------------------------------------------------------------------
+# PRODUCTION ENTRY POINT
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    # Créer les tables si elles n'existent pas
     with app.app_context():
         db.create_all()
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    
+    # Utiliser le port dynamique de Railway ou 5000 par défaut
+    port = int(os.environ.get("PORT", 5000))
+    
+    # En production, désactiver le mode debug
+    debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    
+    app.run(debug=debug, host="0.0.0.0", port=port)
