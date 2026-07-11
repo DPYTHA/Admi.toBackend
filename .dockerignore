@@ -1,12 +1,14 @@
-# .dockerignore
-.venv
+# Créer .dockerignore
+@"
 venv
+.venv
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 .env
 .env.backup
+.env.docker
 .env.local
 .env.*.local
 .git
@@ -18,3 +20,5 @@ app.db
 .vscode
 .idea
 *.log
+docker-compose.yml
+"@ | Out-File -FilePath .dockerignore -Encoding utf8
