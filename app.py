@@ -425,45 +425,6 @@ def health():
 # PRODUCTION ENTRY ADMIN WEB
 # ---------------------------------------------------------------------------
 
-@app.route("/api/admin/users", methods=["GET"])
-@require_admin
-def admin_list_users():
-    users = User.query.order_by(User.created_at.desc()).all()
-    return jsonify([u.to_dict() for u in users])
-
-@app.route("/api/admin/users/<int:user_id>", methods=["GET"])
-@require_admin
-def admin_get_user(user_id):
-    user = User.query.get_or_404(user_id)
-    return jsonify(user.to_dict())
-
-@app.route("/api/admin/subscriptions", methods=["GET"])
-@require_admin
-def admin_list_subscriptions():
-    subs = Subscription.query.order_by(Subscription.started_at.desc()).all()
-    return jsonify([s.to_dict() for s in subs])
-
-@app.route("/api/admin/stats", methods=["GET"])
-@require_admin
-def admin_stats():
-    total_users = User.query.count()
-    active_users = User.query.filter_by(account_status="active").count()
-    total_offers = Offer.query.count()
-    active_subs = Subscription.query.filter_by(is_active=True).count()
-    
-    return jsonify({
-        "total_users": total_users,
-        "active_users": active_users,
-        "total_offers": total_offers,
-        "active_subscriptions": active_subs,
-        "revenue": active_subs * 3.00
-    })
-
-
-# ============================================================
-# AJOUTER CES ROUTES DANS app.py (après les routes existantes)
-# ============================================================
-
 # ===== ADMIN - GESTION DES UTILISATEURS =====
 @app.route("/api/admin/users", methods=["GET"])
 @require_admin
@@ -471,6 +432,13 @@ def admin_list_users():
     """Liste tous les utilisateurs pour l'administration"""
     users = User.query.order_by(User.created_at.desc()).all()
     return jsonify([u.to_dict() for u in users])
+
+@app.route("/api/admin/users/<int:user_id>", methods=["GET"])
+@require_admin
+def admin_get_user(user_id):
+    """Récupère un utilisateur spécifique"""
+    user = User.query.get_or_404(user_id)
+    return jsonify(user.to_dict())
 
 # ===== ADMIN - GESTION DES ABONNEMENTS =====
 @app.route("/api/admin/subscriptions", methods=["GET"])
