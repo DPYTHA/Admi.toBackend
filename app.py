@@ -424,15 +424,22 @@ def health():
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
+# app.py - À la fin du fichier
+
+# ---------------------------------------------------------------------------
+# PRODUCTION ENTRY POINT
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Créer les tables si elles n'existent pas
+    # Création les tables si elles n'existent pas
     with app.app_context():
         db.create_all()
+        print("✅ Database tables created/verified")
     
-    # Utiliser le port dynamique de Railway ou 5000 par défaut
+    #le port dynamique de Railway ou 5000 par défaut
     port = int(os.environ.get("PORT", 5000))
     
     # En production, désactiver le mode debug
     debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
     
+    print(f"🚀 Starting server on port {port} (debug={debug})")
     app.run(debug=debug, host="0.0.0.0", port=port)

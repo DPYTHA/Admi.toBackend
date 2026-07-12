@@ -1,3 +1,4 @@
+# config.py
 import os
 from dotenv import load_dotenv
 
@@ -5,10 +6,17 @@ load_dotenv()
 
 class Config:
     # Base de données PostgreSQL
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL",
-        "postgresql://admito_user:Pytha1991@localhost:5432/admito_db"
-    )
+    database_url = os.environ.get("DATABASE_URL")
+    
+    # Railway utilise parfois 'postgres://' au lieu de 'postgresql://'
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    # Si DATABASE_URL n'existe pas, utiliser local
+    if not database_url:
+        database_url = "postgresql://admito_user:Pytha1991@localhost:5432/admito_db"
+    
+    SQLALCHEMY_DATABASE_URI = database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # JWT
@@ -27,7 +35,7 @@ class Config:
     PAYPAL_BASE_URL = os.environ.get("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
 
     # Abonnement
-    SUBSCRIPTION_PRICE_EUR = 3.00
+    SUBSCRIPTION_PRICE_EUR = float(os.environ.get("SUBSCRIPTION_PRICE_EUR", "3.00"))
 
     # Identifiants admin (email + mot de passe) pour acceder a l'ecran d'administration
     # dans l'app et gerer les offres. Le mot de passe est stocke sous forme de hash bcrypt,
