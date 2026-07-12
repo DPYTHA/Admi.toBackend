@@ -477,16 +477,105 @@ def admin_stats():
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    # Création les tables si elles n'existent pas
-    with app.app_context():
+
+@app.route("/api/admin/init-db", methods=["POST"])
+@require_admin
+def init_database():
+    """Force la création des tables et ajoute des données de test"""
+    try:
+        print("🔧 Initialisation forcée de la base de données...")
+        
+        # 1. Créer les tables
         db.create_all()
-        print("✅ Database tables created/verified")
+        print("✅ Tables créées")
+        
+        # 2. Vérifier les tables
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f"📋 Tables: {tables}")
+        
+        # 3. Ajouter des offres de test si la table est vide
+        if "offers" in tables and Offer.query.count() == 0:
+            print("📝 Ajout d'offres de test...")
+            from datetime import date, timedelta
+            
+            demo_offers = [
+                Offer(
+                    title="Bourse d'excellence Erasmus+",
+                    organization="Union Européenne",
+                    category="bourse",
+                    country="Europe",
+                    description="Bourse de mobilité pour études en Europe",
+                    deadline=date(2026, 12, 31)
+                ),
+                Offer(
+                    title="Master en Intelligence Artificielle",
+                    organization="Université de Paris",
+                    category="admission",
+                    country="France",
+                    description="Master en IA avec spécialisation en Deep Learning",
+                    deadline=date(2026, 10, 15)
+                ),
+                Offer(
+                    title="Développeur Full-Stack",
+                    organization="TechCorp",
+                    category="travail",
+                    country="France",
+                    description="Poste en CDI pour développeur Full-Stack",
+                    deadline=date(2026, 9, 30)
+                ),
+            ]
+            
+            for offer in demo_offers:
+                db.session.add(offer)
+            db.session.commit()
+            print(f"✅ {len(demo_offers)} offres ajoutées")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Base de données initialisée avec succès",
+            "tables": tables,
+            "offer_count": Offer.query.count(),
+            "user_count": User.query.count()
+        })
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"❌ Erreur: {error_detail}")
+        return jsonify({
+            "error": str(e),
+            "detail": error_detail
+        }), 500
+# ---------------------------------------------------------------------------
+# PRODUCTION ENTRY POINT
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    with app.app_context():
+        print("🔧 Création des tables...")
+        
+        # FORCER la création de toutes les tables
+        db.create_all()
+        
+        print("✅ Tables créées avec succès !")
+        
+        # Vérifier que les tables existent
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f"📋 Tables dans la base de données: {tables}")
+        
+        if "offers" not in tables:
+            print("❌ ERREUR: La table 'offers' n'a pas été créée !")
+            # Tenter une création forcée
+            db.create_all()
+            tables = inspector.get_table_names()
+            print(f"📋 Tables après création forcée: {tables}")
+        else:
+            print(f"✅ Table 'offers' trouvée avec {Offer.query.count()} offres")
     
-    #le port dynamique de Railway ou 5000 par défaut
     port = int(os.environ.get("PORT", 5000))
-    
-    # En production, désactiver le mode debug
     debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
     
     print(f"🚀 Starting server on port {port} (debug={debug})")
