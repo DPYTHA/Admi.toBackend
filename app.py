@@ -459,6 +459,53 @@ def admin_stats():
         "revenue": active_subs * 3.00
     })
 
+
+# ============================================================
+# AJOUTER CES ROUTES DANS app.py (après les routes existantes)
+# ============================================================
+
+# ===== ADMIN - GESTION DES UTILISATEURS =====
+@app.route("/api/admin/users", methods=["GET"])
+@require_admin
+def admin_list_users():
+    """Liste tous les utilisateurs pour l'administration"""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify([u.to_dict() for u in users])
+
+# ===== ADMIN - GESTION DES ABONNEMENTS =====
+@app.route("/api/admin/subscriptions", methods=["GET"])
+@require_admin
+def admin_list_subscriptions():
+    """Liste tous les abonnements"""
+    subs = Subscription.query.order_by(Subscription.started_at.desc().nullslast()).all()
+    return jsonify([s.to_dict() for s in subs])
+
+# ===== ADMIN - STATISTIQUES =====
+@app.route("/api/admin/stats", methods=["GET"])
+@require_admin
+def admin_stats():
+    """Statistiques générales pour le dashboard"""
+    total_users = User.query.count()
+    active_users = User.query.filter_by(account_status="active").count()
+    total_offers = Offer.query.count()
+    active_subs = Subscription.query.filter_by(is_active=True).count()
+    
+    # Compter les offres par catégorie
+    offers_by_category = {}
+    for cat in ["bourse", "admission", "travail"]:
+        offers_by_category[cat] = Offer.query.filter_by(category=cat).count()
+    
+    # Revenus (3€ par abonnement actif)
+    revenue = active_subs * 3.00
+    
+    return jsonify({
+        "total_users": total_users,
+        "active_users": active_users,
+        "total_offers": total_offers,
+        "active_subscriptions": active_subs,
+        "offers_by_category": offers_by_category,
+        "revenue": revenue
+    })
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
