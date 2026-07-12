@@ -1,31 +1,20 @@
-# init_db_railway.py
-import os
-import sys
+# init_db.py
 from app import app, db
 from models import User, Offer, Application, Subscription
 from datetime import date
 
 def init_database():
-    """Initialise la base de données sur Railway"""
     with app.app_context():
-        print("🔧 Initialisation de la base de données...")
-        
-        # Créer les tables
+        print("🔧 Création des tables...")
         db.create_all()
         print("✅ Tables créées")
         
-        # Vérifier
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
         print(f"📋 Tables: {tables}")
         
-        if "offers" not in tables:
-            print("❌ La table 'offers' n'existe pas !")
-            sys.exit(1)
-        
-        # Ajouter des offres de test
-        if Offer.query.count() == 0:
+        if "offers" in tables and Offer.query.count() == 0:
             print("📝 Ajout d'offres de test...")
             demo_offers = [
                 Offer(
@@ -45,7 +34,7 @@ def init_database():
                     deadline=date(2026, 10, 15)
                 ),
                 Offer(
-                    title="Développeur Full-Stack Senior",
+                    title="Développeur Full-Stack",
                     organization="TechCorp",
                     category="travail",
                     country="France",
@@ -57,10 +46,6 @@ def init_database():
                 db.session.add(offer)
             db.session.commit()
             print(f"✅ {len(demo_offers)} offres ajoutées")
-        else:
-            print(f"✅ {Offer.query.count()} offres déjà présentes")
-        
-        print("✅ Initialisation terminée avec succès !")
 
 if __name__ == "__main__":
     init_database()

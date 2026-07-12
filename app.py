@@ -551,32 +551,55 @@ def init_database():
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
+# Fin de app.py
 if __name__ == "__main__":
     with app.app_context():
-        print("🔧 Création des tables...")
-        
-        # FORCER la création de toutes les tables
+        # Créer les tables au démarrage
         db.create_all()
+        print("✅ Database tables created/verified")
         
-        print("✅ Tables créées avec succès !")
-        
-        # Vérifier que les tables existent
+        # Vérifier les tables
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
-        print(f"📋 Tables dans la base de données: {tables}")
+        print(f"📋 Tables: {tables}")
         
-        if "offers" not in tables:
-            print("❌ ERREUR: La table 'offers' n'a pas été créée !")
-            # Tenter une création forcée
-            db.create_all()
-            tables = inspector.get_table_names()
-            print(f"📋 Tables après création forcée: {tables}")
-        else:
-            print(f"✅ Table 'offers' trouvée avec {Offer.query.count()} offres")
+        # Ajouter des offres de test si nécessaire
+        if "offers" in tables and Offer.query.count() == 0:
+            from datetime import date
+            demo_offers = [
+                Offer(
+                    title="Bourse d'excellence Erasmus+",
+                    organization="Union Européenne",
+                    category="bourse",
+                    country="Europe",
+                    description="Bourse de mobilité pour études en Europe",
+                    deadline=date(2026, 12, 31)
+                ),
+                Offer(
+                    title="Master en Intelligence Artificielle",
+                    organization="Université de Paris",
+                    category="admission",
+                    country="France",
+                    description="Master en IA avec spécialisation Deep Learning",
+                    deadline=date(2026, 10, 15)
+                ),
+                Offer(
+                    title="Développeur Full-Stack",
+                    organization="TechCorp",
+                    category="travail",
+                    country="France",
+                    description="Poste en CDI pour développeur Full-Stack",
+                    deadline=date(2026, 9, 30)
+                ),
+            ]
+            for offer in demo_offers:
+                db.session.add(offer)
+            db.session.commit()
+            print(f"✅ {len(demo_offers)} offres de test ajoutées")
     
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
     
-    print(f"🚀 Starting server on port {port} (debug={debug})")
+    print(f"🚀 Starting server on port {port}")
     app.run(debug=debug, host="0.0.0.0", port=port)
