@@ -21,6 +21,55 @@ CORS(app)
 db.init_app(app)
 jwt = JWTManager(app)
 
+# === AJOUTER ICI L'INITIALISATION ===
+with app.app_context():
+    try:
+        db.create_all()
+        print("✅ Tables vérifiées/créées au chargement")
+        
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f"📋 Tables: {tables}")
+        
+        # Ajouter des offres de test si nécessaire
+        if "offers" in tables and Offer.query.count() == 0:
+            from datetime import date
+            print("📝 Ajout d'offres de test...")
+            demo_offers = [
+                Offer(
+                    title="Bourse d'excellence Erasmus+",
+                    organization="Union Européenne",
+                    category="bourse",
+                    country="Europe",
+                    description="Bourse de mobilité pour études en Europe",
+                    deadline=date(2026, 12, 31)
+                ),
+                Offer(
+                    title="Master en Intelligence Artificielle",
+                    organization="Université de Paris",
+                    category="admission",
+                    country="France",
+                    description="Master en IA avec spécialisation Deep Learning",
+                    deadline=date(2026, 10, 15)
+                ),
+                Offer(
+                    title="Développeur Full-Stack",
+                    organization="TechCorp",
+                    category="travail",
+                    country="France",
+                    description="Poste en CDI pour développeur Full-Stack",
+                    deadline=date(2026, 9, 30)
+                ),
+            ]
+            for offer in demo_offers:
+                db.session.add(offer)
+            db.session.commit()
+            print(f"✅ {len(demo_offers)} offres de test ajoutées")
+            
+    except Exception as e:
+        print(f"⚠️ Erreur d'initialisation: {e}")
+
 
 def require_admin(f):
     """Protege une route : necessite un token JWT admin (obtenu via /api/admin/login)."""
