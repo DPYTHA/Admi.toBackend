@@ -12,11 +12,17 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     Crée une transaction Genius Pay et retourne l'URL de checkout.
     """
     url = f"{config.GENIUS_PAY_API_URL}/payments"
+    
+    print(f"🔗 URL Genius Pay: {url}")
+    print(f"🔑 API Key: {config.GENIUS_PAY_API_KEY[:10]}...")
+    print(f"🔒 API Secret: {config.GENIUS_PAY_API_SECRET[:10]}...")
+    
     headers = {
         "X-API-Key": config.GENIUS_PAY_API_KEY,
         "X-API-Secret": config.GENIUS_PAY_API_SECRET,
         "Content-Type": "application/json",
     }
+    
     payload = {
         "amount": str(amount),
         "currency": currency,
@@ -32,9 +38,14 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
             "user_id": str(user.id),
         },
     }
+    
+    print(f"📤 Envoi à Genius Pay: {payload}")
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=30)
+        print(f"📥 Réponse Genius Pay: {response.status_code}")
+        print(f"📄 Body: {response.text}")
+        
         response.raise_for_status()
         data = response.json()
         
@@ -53,7 +64,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         print(f"❌ Erreur Genius Pay: {e}")
         if hasattr(e, 'response') and e.response:
             print(f"📄 Réponse: {e.response.text}")
-        raise
+        raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
 
 def get_genius_pay_payment(config, reference):
     """Récupère le statut d'une transaction."""
@@ -78,15 +89,12 @@ def verify_genius_pay_payment(config, reference):
         return False
 
 def verify_genius_pay_webhook_signature(config, timestamp, raw_body, signature_header):
-    """
-    Vérifie la signature du webhook Genius Pay.
-    """
+    """Vérifie la signature du webhook Genius Pay."""
     if not config.GENIUS_PAY_WEBHOOK_SECRET or not signature_header or not timestamp:
         print("⚠️ Webhook: secrets manquants")
         return False
 
     try:
-        # Vérifier le timestamp (max 5 minutes)
         if abs(datetime.utcnow().timestamp() - int(timestamp)) > 300:
             print("⚠️ Webhook: timestamp trop vieux")
             return False
@@ -94,7 +102,6 @@ def verify_genius_pay_webhook_signature(config, timestamp, raw_body, signature_h
         print("⚠️ Webhook: timestamp invalide")
         return False
 
-    # Construire la signature attendue
     data_to_sign = f"{timestamp}.{raw_body.decode()}"
     expected_signature = hmac.new(
         config.GENIUS_PAY_WEBHOOK_SECRET.encode(),
