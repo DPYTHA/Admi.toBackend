@@ -118,3 +118,34 @@ class Subscription(db.Model):
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "current_period_end": self.current_period_end.isoformat() if self.current_period_end else None,
         }
+# models.py - Ajouter à la fin du fichier
+
+class PaymentEvent(db.Model):
+    """Journal des événements de paiement pour audit."""
+    __tablename__ = "payment_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    provider = db.Column(db.String(20))  # genius_pay / paypal
+    reference = db.Column(db.String(255))
+    event_type = db.Column(db.String(50))  # payment.success, payment.failed, etc.
+    status = db.Column(db.String(50))
+    amount = db.Column(db.Float)
+    currency = db.Column(db.String(10))
+    raw_payload = db.Column(db.Text)  # Pour audit complet
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "provider": self.provider,
+            "reference": self.reference,
+            "event_type": self.event_type,
+            "status": self.status,
+            "amount": self.amount,
+            "currency": self.currency,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

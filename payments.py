@@ -1,22 +1,15 @@
-"""
-Module de paiement pour Admi.To.
-Gere les 2 moyens de paiement demandes : Genius Pay et PayPal.
-"""
+# payments.py
 import requests
 import hmac
 import hashlib
 from datetime import datetime, timedelta
 
-
 # ---------------------------------------------------------------------------
-# GENIUS PAY (https://pay.genius.ci) - integration reelle basee sur leur doc officielle
+# GENIUS PAY
 # ---------------------------------------------------------------------------
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
-    Cree une transaction Genius Pay et retourne l'URL de checkout hebergee.
-    On n'envoie pas 'payment_method' : le client choisit lui-meme (Wave, Orange
-    Money, MTN, carte...) sur la page de paiement Genius Pay - c'est l'approche
-    recommandee par leur documentation pour maximiser les conversions.
+    Crée une transaction Genius Pay et retourne l'URL de checkout.
     """
     url = f"{config.GENIUS_PAY_API_URL}/payments"
     headers = {
@@ -25,68 +18,83 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Content-Type": "application/json",
     }
     payload = {
-        "amount": amount,
-        "currency": currency,  # XOF, EUR ou USD - Genius Pay convertit automatiquement
+        "amount": str(amount),
+        "currency": currency,
         "description": "Abonnement mensuel Admi.To",
         "customer": {
             "name": user.full_name,
             "email": user.email,
         },
-        "success_url": f"{config.GENIUS_PAY_REDIRECT_URL}?result=success",
-        "error_url": f"{config.GENIUS_PAY_REDIRECT_URL}?result=error",
+        "success_url": config.GENIUS_PAY_REDIRECT_URL,
+        "error_url": config.GENIUS_PAY_REDIRECT_URL,
         "metadata": {
-            "subscription_id": subscription_id,
-            "user_id": user.id,
+            "subscription_id": str(subscription_id),
+            "user_id": str(user.id),
         },
     }
 
-    response = requests.post(url, json=payload, headers=headers, timeout=15)
-    response.raise_for_status()
-    data = response.json()["data"]
-
-    return {
-        "reference": data["reference"],
-        "checkout_url": data.get("checkout_url") or data.get("payment_url"),
-        "status": data["status"],
-    }
-
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Vérifier la structure de la réponse
+        if "data" in data:
+            result = data["data"]
+        else:
+            result = data
+        
+        return {
+            "reference": result.get("reference"),
+            "checkout_url": result.get("checkout_url") or result.get("payment_url"),
+            "status": result.get("status"),
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erreur Genius Pay: {e}")
+        if hasattr(e, 'response') and e.response:
+            print(f"📄 Réponse: {e.response.text}")
+        raise
 
 def get_genius_pay_payment(config, reference):
-    """Recupere le statut a jour d'une transaction via sa reference (ex: MTX-XXXXXXXXXX)."""
+    """Récupère le statut d'une transaction."""
     url = f"{config.GENIUS_PAY_API_URL}/payments/{reference}"
     headers = {
         "X-API-Key": config.GENIUS_PAY_API_KEY,
         "X-API-Secret": config.GENIUS_PAY_API_SECRET,
     }
-    response = requests.get(url, headers=headers, timeout=15)
+    response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
-    return response.json()["data"]
-
+    data = response.json()
+    return data.get("data", data)
 
 def verify_genius_pay_payment(config, reference):
-    """Verifie qu'une transaction est bien confirmee cote Genius Pay."""
+    """Vérifie qu'une transaction est confirmée."""
     try:
         data = get_genius_pay_payment(config, reference)
-        return data.get("status") == "completed"
-    except Exception:
+        status = data.get("status")
+        return status in ["completed", "success", "approved"]
+    except Exception as e:
+        print(f"❌ Erreur vérification: {e}")
         return False
-
 
 def verify_genius_pay_webhook_signature(config, timestamp, raw_body, signature_header):
     """
-    Verifie la signature d'un webhook Genius Pay.
-    Format documente : HMAC-SHA256(timestamp + "." + json_payload, webhook_secret)
-    Protege aussi contre les attaques par rejeu (timestamp de plus de 5 minutes refuse).
+    Vérifie la signature du webhook Genius Pay.
     """
     if not config.GENIUS_PAY_WEBHOOK_SECRET or not signature_header or not timestamp:
+        print("⚠️ Webhook: secrets manquants")
         return False
 
     try:
+        # Vérifier le timestamp (max 5 minutes)
         if abs(datetime.utcnow().timestamp() - int(timestamp)) > 300:
+            print("⚠️ Webhook: timestamp trop vieux")
             return False
     except ValueError:
+        print("⚠️ Webhook: timestamp invalide")
         return False
 
+    # Construire la signature attendue
     data_to_sign = f"{timestamp}.{raw_body.decode()}"
     expected_signature = hmac.new(
         config.GENIUS_PAY_WEBHOOK_SECRET.encode(),
@@ -94,15 +102,13 @@ def verify_genius_pay_webhook_signature(config, timestamp, raw_body, signature_h
         hashlib.sha256,
     ).hexdigest()
 
-    return hmac.compare_digest(expected_signature, signature_header)
-
+    is_valid = hmac.compare_digest(expected_signature, signature_header)
+    if not is_valid:
+        print("⚠️ Webhook: signature invalide")
+    return is_valid
 
 def register_genius_pay_webhook(config):
-    """
-    Enregistre (une seule fois) l'URL de callback aupres de Genius Pay, pour
-    qu'ils sachent ou envoyer leurs notifications de paiement. A lancer une
-    fois manuellement (voir register_webhook.py), pas a chaque paiement.
-    """
+    """Enregistre le webhook auprès de Genius Pay."""
     url = f"{config.GENIUS_PAY_API_URL}/webhooks"
     headers = {
         "X-API-Key": config.GENIUS_PAY_API_KEY,
@@ -112,12 +118,11 @@ def register_genius_pay_webhook(config):
     payload = {
         "name": "Admi.To - abonnements",
         "url": config.GENIUS_PAY_CALLBACK_URL,
-        "events": ["payment.success", "payment.failed", "payment.expired", "payment.cancelled"],
+        "events": ["payment.success", "payment.failed", "payment.expired"],
     }
-    response = requests.post(url, json=payload, headers=headers, timeout=15)
+    response = requests.post(url, json=payload, headers=headers, timeout=30)
     response.raise_for_status()
     return response.json()
-
 
 # ---------------------------------------------------------------------------
 # PAYPAL
@@ -128,19 +133,15 @@ def get_paypal_access_token(config):
         url,
         data={"grant_type": "client_credentials"},
         auth=(config.PAYPAL_CLIENT_ID, config.PAYPAL_CLIENT_SECRET),
-        timeout=15,
+        timeout=30,
     )
     response.raise_for_status()
     return response.json()["access_token"]
 
-
 def create_paypal_order(config, amount_eur, subscription_id):
-    """Cree une commande PayPal pour l'abonnement mensuel."""
-    # TODO: necessite des vrais identifiants PAYPAL_CLIENT_ID / SECRET
     try:
         token = get_paypal_access_token(config)
     except Exception:
-        # Simulation MVP si les cles ne sont pas encore configurees
         return {
             "status": "CREATED",
             "id": f"SIMULATED-{subscription_id}",
@@ -157,25 +158,22 @@ def create_paypal_order(config, amount_eur, subscription_id):
             "custom_id": f"admito-sub-{subscription_id}",
         }],
     }
-    response = requests.post(url, json=payload, headers=headers, timeout=15)
+    response = requests.post(url, json=payload, headers=headers, timeout=30)
     response.raise_for_status()
     data = response.json()
     approve_url = next((l["href"] for l in data["links"] if l["rel"] == "approve"), None)
     return {"status": data["status"], "id": data["id"], "approve_url": approve_url}
 
-
 def capture_paypal_order(config, order_id):
-    """Confirme le paiement PayPal une fois approuve par l'utilisateur."""
     if order_id.startswith("SIMULATED"):
-        return True  # simulation MVP
+        return True
 
     token = get_paypal_access_token(config)
     url = f"{config.PAYPAL_BASE_URL}/v2/checkout/orders/{order_id}/capture"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    response = requests.post(url, headers=headers, timeout=15)
+    response = requests.post(url, headers=headers, timeout=30)
     response.raise_for_status()
     return response.json().get("status") == "COMPLETED"
-
 
 def compute_next_period_end():
     return datetime.utcnow() + timedelta(days=30)
