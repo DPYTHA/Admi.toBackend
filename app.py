@@ -338,6 +338,8 @@ def get_subscription():
     return jsonify(sub.to_dict() if sub else {"is_active": False})
 
 
+# app.py - Dans la route /api/subscription/pay/genius-pay
+
 @app.route("/api/subscription/pay/genius-pay", methods=["POST"])
 @jwt_required()
 def pay_with_genius_pay():
@@ -345,28 +347,31 @@ def pay_with_genius_pay():
     user = User.query.get_or_404(user_id)
     sub = Subscription.query.filter_by(user_id=user_id).first()
 
-    # Genius Pay convertit automatiquement les devises : on peut envoyer
-    # directement en EUR (devise officielle du prix de l'abonnement), ou en
-    # XOF/USD si le client le demande explicitement. Les autres devises
-    # locales (XAF, CDF...) passent par le choix du moyen de paiement sur
-    # leur page de checkout, pas par ce champ "currency" global.
     data = request.get_json(silent=True) or {}
     currency = data.get("currency", "EUR").upper()
     if currency not in ("EUR", "USD", "XOF"):
         currency = "EUR"
 
     try:
+        print(f"💰 Création paiement Genius Pay pour user {user_id}")
+        print(f"   Montant: {Config.SUBSCRIPTION_PRICE_EUR} {currency}")
+        print(f"   API URL: {Config.GENIUS_PAY_API_URL}")
+        
         result = payments.create_genius_pay_payment(
             Config, Config.SUBSCRIPTION_PRICE_EUR, currency, user, sub.id
         )
-    except Exception:
-        return jsonify({"error": "Impossible de contacter Genius Pay pour le moment"}), 502
+        
+        print(f"✅ Paiement créé: {result}")
+        
+    except Exception as e:
+        print(f"❌ Erreur Genius Pay: {e}")
+        return jsonify({"error": f"Impossible de contacter Genius Pay: {str(e)}"}), 502
 
     sub.provider = "genius_pay"
     sub.provider_reference = result["reference"]
     db.session.commit()
 
-    return jsonify(result)
+    return jsonify(result), 200
 
 
 @app.route("/api/subscription/confirm/genius-pay", methods=["POST"])
