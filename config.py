@@ -40,14 +40,14 @@ class Config:
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "change-this-secret-key")
     JWT_ACCESS_TOKEN_EXPIRES = 60 * 60 * 24 * 7
 
-    # === GENIUS PAY (CORRIGÉ) ===
-    # L'URL correcte pour Genius Pay
-    GENIUS_PAY_API_URL = os.environ.get("GENIUS_PAY_API_URL", "https://api.geniuspay.com/v1/merchant")
+    # === GENIUS PAY - CORRIGÉ AVEC LA BONNE URL ===
+    # ✅ Utiliser geniuspay.ci (comme dans Fabla qui fonctionne)
+    GENIUS_PAY_API_URL = os.environ.get("GENIUS_PAY_API_URL", "https://geniuspay.ci/api/v1/merchant")
     GENIUS_PAY_API_KEY = os.environ.get("GENIUS_PAY_API_KEY", "")
     GENIUS_PAY_API_SECRET = os.environ.get("GENIUS_PAY_API_SECRET", "")
     GENIUS_PAY_WEBHOOK_SECRET = os.environ.get("GENIUS_PAY_WEBHOOK_SECRET", "")
     
-    # URLs de redirection (doivent être accessibles publiquement)
+    # URLs de redirection
     GENIUS_PAY_REDIRECT_URL = os.environ.get(
         "GENIUS_PAY_REDIRECT_URL", 
         "https://admitobackend-production.up.railway.app/api/payment/redirect"
