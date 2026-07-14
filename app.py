@@ -576,6 +576,25 @@ def admin_stats():
         "offers_by_category": offers_by_category,
         "revenue": revenue
     })
+
+
+# app.py - AJOUTER CETTE ROUTE (seulement ça)
+
+@app.route("/api/admin/users/<int:user_id>", methods=["PATCH"])
+@require_admin
+def admin_update_user(user_id):
+    """Active ou désactive un utilisateur"""
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+    
+    if "account_status" in data:
+        if data["account_status"] not in ["active", "inactive"]:
+            return jsonify({"error": "Statut invalide"}), 400
+        user.account_status = data["account_status"]
+        db.session.commit()
+        return jsonify(user.to_dict()), 200
+    
+    return jsonify({"error": "Champ account_status requis"}), 400
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
