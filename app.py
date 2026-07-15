@@ -669,6 +669,38 @@ def init_database():
             "error": str(e),
             "detail": error_detail
         }), 500
+
+
+
+#reinitialiser mots de passe
+
+
+
+@app.route("/api/auth/check-email", methods=["POST"])
+def check_email():
+    """Vérifie si un email existe"""
+    data = request.get_json()
+    email = data.get("email")
+    user = User.query.filter_by(email=email).first()
+    if user:
+        return jsonify({"exists": True, "email": email}), 200
+    return jsonify({"exists": False}), 404
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+def reset_password():
+    """Réinitialise le mot de passe"""
+    data = request.get_json()
+    email = data.get("email")
+    new_password = data.get("new_password")
+    
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "Email non trouvé"}), 404
+    
+    user.set_password(new_password)
+    db.session.commit()
+    
+    return jsonify({"message": "Mot de passe réinitialisé"}), 200
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
