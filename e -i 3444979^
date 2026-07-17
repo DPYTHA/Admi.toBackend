@@ -1,0 +1,31 @@
+[33m531e879[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m minor changes
+[33m9990e74[m minor changes
+[33m3444979[m minor changes
+[33m7182ff7[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m minor changes
+[33ma2457ce[m minor changes
+[33m217fde4[m minor changes
+[33m04d5a96[m Fix: Utiliser geniuspay.ci au lieu de api.geniuspay.com
+[33m4879776[m Fix SSL Genius Pay
+[33mc35fff6[m minor changes
+[33m05549d9[m minor changes
+[33m2d071f7[m minor changes
+[33m5eb9179[m minor changes
+[33m1efbc72[m minor changes
+[33mdaf3aad[m minor changes
+[33m5a81fc9[m minor changes
+[33mff5d5bb[m minor changes
+[33m6ed9d64[m minor changes
+[33m5bcb814[m Ajout des routes admin pour le dashboard
+[33mc8f95fc[m minor changes
+[33m8be8e57[m minor changes
+[33m205b3cb[m minor changes
+[33mef096b2[m minor changes
+[33mdf9f4ce[m minor changes
+[33m2b203aa[m fix: add runtime.txt, Procfile, entrypoint.sh for Railway deployment
+[33mfa26e66[m minor changes
+[33m6f40a46[m minor changes
+[33mb79e5d9[m minor changes
+[33md89ad60[m minor changes
+[33m3516735[m minor changes
+[33m4dac339[m minor changes
+[33m563193f[m first commit: backend API
