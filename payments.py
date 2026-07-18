@@ -4,18 +4,16 @@ Module de paiement pour Admi.To.
 import requests
 import hmac
 import hashlib
-import urllib3
+import urllib3 
 from datetime import datetime, timedelta
-
+import json  
 # Désactiver les avertissements SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ---------------------------------------------------------------------------
-# GENIUS PAY - Version Fabla (qui fonctionne)
+# GENIUS PAY
 # ---------------------------------------------------------------------------
-# payments.py - Modifier create_genius_pay_payment
-
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
     Crée une transaction Genius Pay.
@@ -28,7 +26,6 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Content-Type": "application/json",
     }
     
-    # ✅ Récupérer le pays de l'utilisateur
     customer_country = user.country or "France"
     
     payload = {
@@ -38,7 +35,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "customer": {
             "name": user.full_name,
             "email": user.email,
-            "country": customer_country  # ✅ AJOUTER LE PAYS
+            "country": customer_country
         },
         "success_url": config.GENIUS_PAY_REDIRECT_URL,
         "error_url": config.GENIUS_PAY_REDIRECT_URL,
@@ -52,6 +49,9 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     print(f"   Montant: {amount} {currency}")
     print(f"   Utilisateur: {user.full_name}")
     print(f"   Pays: {customer_country}")
+    
+    # ✅ Afficher le payload complet
+    print(f"📤 Payload: {json.dumps(payload, indent=2)}")
 
     try:
         response = requests.post(
@@ -63,9 +63,25 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         )
         
         print(f"📥 Status: {response.status_code}")
+        print(f"📥 Headers: {dict(response.headers)}")
+        
+        # ✅ Afficher la réponse brute
+        raw_response = response.text
+        print(f"📥 Réponse brute: {raw_response[:500]}")
+        
+        # ✅ Si la réponse est vide, lever une exception claire
+        if not raw_response or raw_response.strip() == "":
+            raise Exception("Réponse vide de Genius Pay")
+        
+        # ✅ Tenter de parser le JSON
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            print(f"❌ Erreur JSON: {e}")
+            print(f"📄 Contenu reçu: {raw_response}")
+            raise Exception(f"Réponse non-JSON: {raw_response[:100]}")
         
         if response.status_code in [200, 201]:
-            data = response.json()
             if "data" in data:
                 result = data["data"]
             else:
@@ -77,16 +93,16 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
                 "status": result.get("status"),
             }
         else:
-            print(f"❌ Erreur: {response.text}")
-            raise Exception(f"Genius Pay erreur {response.status_code}: {response.text}")
+            print(f"❌ Erreur: {data}")
+            raise Exception(f"Genius Pay erreur {response.status_code}: {data}")
             
     except requests.exceptions.RequestException as e:
-        print(f"❌ Erreur Genius Pay: {e}")
+        print(f"❌ Erreur Request: {e}")
         if hasattr(e, 'response') and e.response:
             print(f"📄 Réponse: {e.response.text}")
         raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
-    
-    
+
+
 def get_genius_pay_payment(config, reference):
     """Récupère le statut d'un paiement."""
     url = f"{config.GENIUS_PAY_API_URL}/payments/{reference}"
