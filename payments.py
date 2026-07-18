@@ -100,14 +100,17 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Accept": "application/json",
     }
     
-    # ✅ Récupérer le pays et le téléphone
     country_code = get_country_code(user.country)
     customer_phone = get_user_phone(user)
     
-    # ✅ Payload comme dans Fabla
+    # ✅ Utiliser EUR (comme dans Fabla)
+    # Plus de méthodes de paiement disponibles en EUR
+    payment_currency = "EUR"
+    payment_amount = amount  # 3.0
+    
     payload = {
-        "amount": amount,
-        "currency": "XOF",
+        "amount": payment_amount,
+        "currency": payment_currency,
         "description": "Abonnement mensuel Admi.To",
         "customer": {
             "name": user.full_name,
@@ -122,7 +125,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         }
     }
 
-    print(f"💰 Paiement: {amount} XOF | Utilisateur: {user.full_name} | Tél: {customer_phone}")
+    print(f"💰 Paiement: {payment_amount} {payment_currency} | Utilisateur: {user.full_name} | Tél: {customer_phone}")
 
     try:
         response = requests.post(
