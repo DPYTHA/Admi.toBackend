@@ -14,10 +14,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ---------------------------------------------------------------------------
 # GENIUS PAY - Version Fabla (qui fonctionne)
 # ---------------------------------------------------------------------------
+# payments.py - Modifier create_genius_pay_payment
+
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
     Crée une transaction Genius Pay.
-    Utilise la même configuration que Fabla.
     """
     url = f"{config.GENIUS_PAY_API_URL}/payments"
     
@@ -27,6 +28,9 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Content-Type": "application/json",
     }
     
+    # ✅ Récupérer le pays de l'utilisateur
+    customer_country = user.country or "France"
+    
     payload = {
         "amount": str(amount),
         "currency": currency,
@@ -34,6 +38,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "customer": {
             "name": user.full_name,
             "email": user.email,
+            "country": customer_country  # ✅ AJOUTER LE PAYS
         },
         "success_url": config.GENIUS_PAY_REDIRECT_URL,
         "error_url": config.GENIUS_PAY_REDIRECT_URL,
@@ -46,15 +51,15 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     print(f"💰 Envoi à Genius Pay: {url}")
     print(f"   Montant: {amount} {currency}")
     print(f"   Utilisateur: {user.full_name}")
+    print(f"   Pays: {customer_country}")
 
     try:
-        # Comme dans Fabla
         response = requests.post(
             url, 
             json=payload, 
             headers=headers, 
             timeout=30,
-            verify=False  # Désactiver SSL pour développement
+            verify=False
         )
         
         print(f"📥 Status: {response.status_code}")
@@ -80,8 +85,8 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         if hasattr(e, 'response') and e.response:
             print(f"📄 Réponse: {e.response.text}")
         raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
-
-
+    
+    
 def get_genius_pay_payment(config, reference):
     """Récupère le statut d'un paiement."""
     url = f"{config.GENIUS_PAY_API_URL}/payments/{reference}"

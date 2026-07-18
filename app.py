@@ -340,6 +340,8 @@ def get_subscription():
 
 # app.py - Dans la route /api/subscription/pay/genius-pay
 
+# app.py - Dans pay_with_genius_pay
+
 @app.route("/api/subscription/pay/genius-pay", methods=["POST"])
 @jwt_required()
 def pay_with_genius_pay():
@@ -352,16 +354,18 @@ def pay_with_genius_pay():
     if currency not in ("EUR", "USD", "XOF"):
         currency = "EUR"
 
-    # ✅ AJOUTER LE PAYS DU CLIENT
-    customer_country = user.country or "CI"  # Par défaut, Côte d'Ivoire
-
     try:
         print(f"💰 Création paiement Genius Pay pour user {user_id}")
         print(f"   Montant: {Config.SUBSCRIPTION_PRICE_EUR} {currency}")
-        print(f"   Pays: {customer_country}")
+        print(f"   Pays: {user.country}")  # ✅ Afficher le pays
         
         result = payments.create_genius_pay_payment(
-            Config, Config.SUBSCRIPTION_PRICE_EUR, currency, user, sub.id, customer_country
+            Config, 
+            Config.SUBSCRIPTION_PRICE_EUR, 
+            currency, 
+            user, 
+            sub.id
+            # ✅ PAS de 6ème argument - le pays est pris depuis user.country
         )
         
         print(f"✅ Paiement créé: {result}")
@@ -404,74 +408,6 @@ def confirm_genius_pay():
         "subscription": sub.to_dict() if sub else None,
     }), 402
 
-
-def create_genius_pay_payment(config, amount, currency, user, subscription_id, country="CI"):
-    """
-    Crée une transaction Genius Pay avec le pays du client.
-    """
-    url = f"{config.GENIUS_PAY_API_URL}/payments"
-    
-    headers = {
-        "X-API-Key": config.GENIUS_PAY_API_KEY,
-        "X-API-Secret": config.GENIUS_PAY_API_SECRET,
-        "Content-Type": "application/json",
-    }
-    
-    payload = {
-        "amount": str(amount),
-        "currency": currency,
-        "description": "Abonnement mensuel Admi.To",
-        "customer": {
-            "name": user.full_name,
-            "email": user.email,
-            "phone": user.phone if hasattr(user, 'phone') else "00000000",
-            "country": country  # ✅ AJOUTER LE PAYS
-        },
-        "success_url": config.GENIUS_PAY_REDIRECT_URL,
-        "error_url": config.GENIUS_PAY_REDIRECT_URL,
-        "metadata": {
-            "subscription_id": str(subscription_id),
-            "user_id": str(user.id),
-        },
-    }
-
-    print(f"💰 Envoi à Genius Pay: {url}")
-    print(f"   Montant: {amount} {currency}")
-    print(f"   Utilisateur: {user.full_name}")
-    print(f"   Pays: {country}")
-
-    try:
-        response = requests.post(
-            url, 
-            json=payload, 
-            headers=headers, 
-            timeout=30,
-            verify=False
-        )
-        
-        print(f"📥 Status: {response.status_code}")
-        
-        if response.status_code in [200, 201]:
-            data = response.json()
-            if "data" in data:
-                result = data["data"]
-            else:
-                result = data
-            
-            return {
-                "reference": result.get("reference"),
-                "checkout_url": result.get("checkout_url") or result.get("payment_url"),
-                "status": result.get("status"),
-            }
-        else:
-            print(f"❌ Erreur: {response.text}")
-            raise Exception(f"Genius Pay erreur {response.status_code}: {response.text}")
-            
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erreur Genius Pay: {e}")
-        if hasattr(e, 'response') and e.response:
-            print(f"📄 Réponse: {e.response.text}")
-        raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
     
 @app.route("/api/payment/webhook", methods=["POST"])
 def genius_pay_webhook():
