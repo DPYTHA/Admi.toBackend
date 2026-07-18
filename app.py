@@ -153,6 +153,156 @@ def login():
     token = create_access_token(identity=str(user.id))
     return jsonify({"token": token, "user": user.to_dict()}), 200
 
+# app.py - Ajouter cette fonction
+
+def get_country_code(country_name):
+    """
+    Convertit un nom de pays en code ISO à 2 lettres.
+    """
+    if not country_name:
+        return "CI"  # Par défaut, Côte d'Ivoire
+    
+    # Si c'est déjà un code ISO (2 caractères), le retourner
+    if len(country_name) == 2 and country_name.isalpha():
+        return country_name.upper()
+    
+    # Mapping des pays
+    country_map = {
+        # Afrique de l'Ouest
+        "côte d'ivoire": "CI",
+        "cote d'ivoire": "CI",
+        "côte d’ivoire": "CI",
+        "senegal": "SN",
+        "cameroun": "CM",
+        "benin": "BJ",
+        "togo": "TG",
+        "mali": "ML",
+        "burkina faso": "BF",
+        "niger": "NE",
+        "nigeria": "NG",
+        "ghana": "GH",
+        "guinee": "GN",
+        "guinée": "GN",
+        "liberia": "LR",
+        "sierra leone": "SL",
+        "gambie": "GM",
+        "mauritanie": "MR",
+        "cap vert": "CV",
+        "cap-vert": "CV",
+        
+        # Afrique centrale
+        "rdc": "CD",
+        "republique democratique du congo": "CD",
+        "congo": "CG",
+        "republique du congo": "CG",
+        "gabon": "GA",
+        "guinee equatoriale": "GQ",
+        "guinée équatoriale": "GQ",
+        "tchad": "TD",
+        "centrafrique": "CF",
+        "republique centrafricaine": "CF",
+        "sao tome": "ST",
+        "sao tome et principe": "ST",
+        
+        # Afrique de l'Est
+        "kenya": "KE",
+        "tanzanie": "TZ",
+        "ouganda": "UG",
+        "rwanda": "RW",
+        "burundi": "BI",
+        "ethiopie": "ET",
+        "erythree": "ER",
+        "soudan": "SD",
+        "soudan du sud": "SS",
+        "djibouti": "DJ",
+        "somalie": "SO",
+        
+        # Afrique Australe
+        "afrique du sud": "ZA",
+        "south africa": "ZA",
+        "zambie": "ZM",
+        "zimbabwe": "ZW",
+        "mozambique": "MZ",
+        "malawi": "MW",
+        "botswana": "BW",
+        "namibie": "NA",
+        "angola": "AO",
+        "madagascar": "MG",
+        "maurice": "MU",
+        "comores": "KM",
+        "seychelles": "SC",
+        
+        # Afrique du Nord
+        "maroc": "MA",
+        "tunisie": "TN",
+        "algerie": "DZ",
+        "algeria": "DZ",
+        "libye": "LY",
+        "egypte": "EG",
+        "mauritanie": "MR",
+        
+        # Europe
+        "france": "FR",
+        "belgique": "BE",
+        "belgium": "BE",
+        "suisse": "CH",
+        "switzerland": "CH",
+        "luxembourg": "LU",
+        "royaume-uni": "GB",
+        "united kingdom": "GB",
+        "angleterre": "GB",
+        "allemagne": "DE",
+        "germany": "DE",
+        "espagne": "ES",
+        "spain": "ES",
+        "italie": "IT",
+        "italy": "IT",
+        "portugal": "PT",
+        "pays-bas": "NL",
+        "netherlands": "NL",
+        "irlande": "IE",
+        "ireland": "IE",
+        
+        # Amérique
+        "canada": "CA",
+        "etats-unis": "US",
+        "états-unis": "US",
+        "united states": "US",
+        "amerique": "US",
+        "bresil": "BR",
+        "brazil": "BR",
+        
+        # Asie
+        "chine": "CN",
+        "china": "CN",
+        "japon": "JP",
+        "japan": "JP",
+        "inde": "IN",
+        "india": "IN",
+        
+        # Océanie
+        "australie": "AU",
+        "australia": "AU",
+        
+        # Autres
+        "europe": "EU",
+        "international": "EU",
+    }
+    
+    # Normaliser le nom du pays
+    normalized = country_name.lower().strip()
+    
+    # Chercher dans le mapping
+    for key, value in country_map.items():
+        if key in normalized or normalized in key:
+            print(f"🔍 Conversion pays: '{country_name}' → '{value}'")
+            return value
+    
+    # Si non trouvé, retourner "CI" par défaut
+    print(f"⚠️ Pays non reconnu: '{country_name}', utilisation de CI par défaut")
+    return "CI"
+
+
 
 @app.route("/api/auth/me", methods=["GET"])
 @jwt_required()

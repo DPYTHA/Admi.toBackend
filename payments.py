@@ -26,6 +26,7 @@ def log_debug(message, data=None):
             print(f"🔍 {message}: {data}")
         else:
             print(f"🔍 {message}")
+# payments.py - Dans create_genius_pay_payment
 
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
@@ -40,7 +41,9 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Accept": "application/json",
     }
     
-    customer_country = user.country or "France"
+    # ✅ Utiliser la fonction de conversion
+    from app import get_country_code  # Importer la fonction
+    country_code = get_country_code(user.country)
     
     payload = {
         "amount": str(amount),
@@ -49,7 +52,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "customer": {
             "name": user.full_name,
             "email": user.email,
-            "country": customer_country
+            "country": country_code  # ✅ Envoyer le code ISO
         },
         "success_url": config.GENIUS_PAY_REDIRECT_URL,
         "error_url": config.GENIUS_PAY_REDIRECT_URL,
@@ -59,8 +62,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         },
     }
 
-    # ✅ Logs simplifiés (moins de caractères)
-    print(f"💰 Paiement: {amount} {currency} | Utilisateur: {user.full_name} | Pays: {customer_country}")
+    print(f"💰 Paiement: {amount} {currency} | Utilisateur: {user.full_name} | Pays: {country_code} ({user.country})")
 
     try:
         response = requests.post(
@@ -74,8 +76,6 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         print(f"📥 Status: {response.status_code}")
         
         raw_response = response.text
-        if DEBUG:
-            print(f"📥 Réponse: {raw_response[:200]}...")
         
         if not raw_response or raw_response.strip() == "":
             raise Exception("Réponse vide de Genius Pay")
@@ -103,8 +103,6 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
             
     except requests.exceptions.RequestException as e:
         print(f"❌ Erreur Request: {e}")
-        if hasattr(e, 'response') and e.response and DEBUG:
-            print(f"📄 Réponse: {e.response.text}")
         raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
     
 
