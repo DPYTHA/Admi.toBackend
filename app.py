@@ -352,13 +352,16 @@ def pay_with_genius_pay():
     if currency not in ("EUR", "USD", "XOF"):
         currency = "EUR"
 
+    # ✅ AJOUTER LE PAYS DU CLIENT
+    customer_country = user.country or "CI"  # Par défaut, Côte d'Ivoire
+
     try:
         print(f"💰 Création paiement Genius Pay pour user {user_id}")
         print(f"   Montant: {Config.SUBSCRIPTION_PRICE_EUR} {currency}")
-        print(f"   API URL: {Config.GENIUS_PAY_API_URL}")
+        print(f"   Pays: {customer_country}")
         
         result = payments.create_genius_pay_payment(
-            Config, Config.SUBSCRIPTION_PRICE_EUR, currency, user, sub.id
+            Config, Config.SUBSCRIPTION_PRICE_EUR, currency, user, sub.id, customer_country
         )
         
         print(f"✅ Paiement créé: {result}")
@@ -373,34 +376,103 @@ def pay_with_genius_pay():
 
     return jsonify(result), 200
 
-
 @app.route("/api/subscription/confirm/genius-pay", methods=["POST"])
 @jwt_required()
 def confirm_genius_pay():
-    """
-    Route de CONSULTATION uniquement, appelee par l'app juste apres que
-    l'utilisateur revient de Genius Pay, pour donner un retour immediat
-    dans l'UI.
-
-    ⚠️ Cette route NE DOIT JAMAIS activer l'abonnement elle-meme. Ouvrir la
-    page de paiement (l'intention de payer) ne prouve pas que le paiement a
-    reellement eu lieu - seul le webhook Genius Pay (/api/payment/webhook),
-    appele serveur a serveur et signe, est une preuve fiable. Cette route se
-    contente donc de refleter l'etat deja enregistre par le webhook, sans
-    jamais interroger ou activer quoi que ce soit elle-meme.
-    """
     user_id = get_jwt_identity()
     sub = Subscription.query.filter_by(user_id=user_id).first()
 
     if sub and sub.is_active:
-        return jsonify({"message": "Abonnement actif", "subscription": sub.to_dict()})
+        return jsonify({"message": "Abonnement actif", "subscription": sub.to_dict()}), 200
+
+    # ✅ VÉRIFIER LE STATUT AUPRÈS DE GENIUS PAY
+    if sub and sub.provider_reference:
+        try:
+            is_paid = payments.verify_genius_pay_payment(Config, sub.provider_reference)
+            if is_paid:
+                user = User.query.get(user_id)
+                _activate_subscription(user, sub)
+                return jsonify({
+                    "message": "Paiement confirmé !",
+                    "subscription": sub.to_dict()
+                }), 200
+        except Exception as e:
+            print(f"❌ Erreur vérification paiement: {e}")
 
     return jsonify({
-        "error": "Paiement pas encore confirme. Cela peut prendre quelques instants apres le paiement.",
+        "error": "Paiement pas encore confirmé.",
         "subscription": sub.to_dict() if sub else None,
     }), 402
 
 
+def create_genius_pay_payment(config, amount, currency, user, subscription_id, country="CI"):
+    """
+    Crée une transaction Genius Pay avec le pays du client.
+    """
+    url = f"{config.GENIUS_PAY_API_URL}/payments"
+    
+    headers = {
+        "X-API-Key": config.GENIUS_PAY_API_KEY,
+        "X-API-Secret": config.GENIUS_PAY_API_SECRET,
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "amount": str(amount),
+        "currency": currency,
+        "description": "Abonnement mensuel Admi.To",
+        "customer": {
+            "name": user.full_name,
+            "email": user.email,
+            "phone": user.phone if hasattr(user, 'phone') else "00000000",
+            "country": country  # ✅ AJOUTER LE PAYS
+        },
+        "success_url": config.GENIUS_PAY_REDIRECT_URL,
+        "error_url": config.GENIUS_PAY_REDIRECT_URL,
+        "metadata": {
+            "subscription_id": str(subscription_id),
+            "user_id": str(user.id),
+        },
+    }
+
+    print(f"💰 Envoi à Genius Pay: {url}")
+    print(f"   Montant: {amount} {currency}")
+    print(f"   Utilisateur: {user.full_name}")
+    print(f"   Pays: {country}")
+
+    try:
+        response = requests.post(
+            url, 
+            json=payload, 
+            headers=headers, 
+            timeout=30,
+            verify=False
+        )
+        
+        print(f"📥 Status: {response.status_code}")
+        
+        if response.status_code in [200, 201]:
+            data = response.json()
+            if "data" in data:
+                result = data["data"]
+            else:
+                result = data
+            
+            return {
+                "reference": result.get("reference"),
+                "checkout_url": result.get("checkout_url") or result.get("payment_url"),
+                "status": result.get("status"),
+            }
+        else:
+            print(f"❌ Erreur: {response.text}")
+            raise Exception(f"Genius Pay erreur {response.status_code}: {response.text}")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erreur Genius Pay: {e}")
+        if hasattr(e, 'response') and e.response:
+            print(f"📄 Réponse: {e.response.text}")
+        raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
+    
 @app.route("/api/payment/webhook", methods=["POST"])
 def genius_pay_webhook():
     """
