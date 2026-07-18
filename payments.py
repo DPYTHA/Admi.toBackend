@@ -1,8 +1,3 @@
-
-
-# ---------------------------------------------------------------------------
-# GENIUS PAY
-# ---------------------------------------------------------------------------
 """
 Module de paiement pour Admi.To.
 """
@@ -19,15 +14,79 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ✅ Variable pour contrôler les logs de débogage
 DEBUG = os.environ.get("PAYMENT_DEBUG", "False").lower() == "true"
 
-def log_debug(message, data=None):
-    """Log seulement si DEBUG est activé"""
-    if DEBUG:
-        if data:
-            print(f"🔍 {message}: {data}")
-        else:
-            print(f"🔍 {message}")
-# payments.py - Dans create_genius_pay_payment
 
+def get_country_code(country_name):
+    """
+    Convertit un nom de pays en code ISO à 2 lettres.
+    """
+    if not country_name:
+        return "CI"
+    
+    if len(country_name) == 2 and country_name.isalpha():
+        return country_name.upper()
+    
+    country_map = {
+        "côte d'ivoire": "CI",
+        "cote d'ivoire": "CI",
+        "côte d’ivoire": "CI",
+        "france": "FR",
+        "senegal": "SN",
+        "cameroun": "CM",
+        "benin": "BJ",
+        "togo": "TG",
+        "mali": "ML",
+        "burkina faso": "BF",
+        "niger": "NE",
+        "nigeria": "NG",
+        "ghana": "GH",
+        "maroc": "MA",
+        "tunisie": "TN",
+        "algerie": "DZ",
+        "algeria": "DZ",
+        "canada": "CA",
+        "etats-unis": "US",
+        "états-unis": "US",
+        "united states": "US",
+        "belgique": "BE",
+        "belgium": "BE",
+        "suisse": "CH",
+        "switzerland": "CH",
+        "royaume-uni": "GB",
+        "united kingdom": "GB",
+        "allemagne": "DE",
+        "germany": "DE",
+        "espagne": "ES",
+        "spain": "ES",
+        "italie": "IT",
+        "italy": "IT",
+        "portugal": "PT",
+        "pays-bas": "NL",
+        "netherlands": "NL",
+    }
+    
+    normalized = country_name.lower().strip()
+    
+    for key, value in country_map.items():
+        if key in normalized or normalized in key:
+            print(f"🔍 Conversion pays: '{country_name}' → '{value}'")
+            return value
+    
+    print(f"⚠️ Pays non reconnu: '{country_name}', utilisation de CI par défaut")
+    return "CI"
+
+
+def get_user_phone(user):
+    """
+    Récupère le téléphone de l'utilisateur.
+    """
+    if hasattr(user, 'phone') and user.phone:
+        return user.phone
+    return "00000000"
+
+
+# ============================================================================
+# GENIUS PAY
+# ============================================================================
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
     Crée une transaction Genius Pay.
@@ -41,56 +100,45 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "Accept": "application/json",
     }
     
-    # ✅ Utiliser la fonction de conversion
-    from app import get_country_code  # Importer la fonction
+    # ✅ Récupérer le pays et le téléphone
     country_code = get_country_code(user.country)
+    customer_phone = get_user_phone(user)
     
+    # ✅ Payload comme dans Fabla
     payload = {
-        "amount": str(amount),
-        "currency": currency,
+        "amount": amount,
+        "currency": "XOF",
         "description": "Abonnement mensuel Admi.To",
         "customer": {
             "name": user.full_name,
+            "phone": customer_phone,
             "email": user.email,
-            "country": country_code  # ✅ Envoyer le code ISO
         },
-        "success_url": config.GENIUS_PAY_REDIRECT_URL,
-        "error_url": config.GENIUS_PAY_REDIRECT_URL,
+        "success_url": config.GENIUS_PAY_REDIRECT_URL + "?result=success",
+        "error_url": config.GENIUS_PAY_REDIRECT_URL + "?result=error",
         "metadata": {
             "subscription_id": str(subscription_id),
             "user_id": str(user.id),
-        },
+        }
     }
 
-    print(f"💰 Paiement: {amount} {currency} | Utilisateur: {user.full_name} | Pays: {country_code} ({user.country})")
+    print(f"💰 Paiement: {amount} XOF | Utilisateur: {user.full_name} | Tél: {customer_phone}")
 
     try:
         response = requests.post(
             url, 
-            data=json.dumps(payload), 
+            json=payload,
             headers=headers, 
             timeout=30,
             verify=False
         )
         
         print(f"📥 Status: {response.status_code}")
-        
-        raw_response = response.text
-        
-        if not raw_response or raw_response.strip() == "":
-            raise Exception("Réponse vide de Genius Pay")
-        
-        try:
-            data = response.json()
-        except json.JSONDecodeError as e:
-            print(f"❌ Erreur JSON: {e}")
-            raise Exception(f"Réponse non-JSON: {raw_response[:100]}")
+        print(f"📥 Response: {response.text[:500] if response.text else 'Vide'}")
         
         if response.status_code in [200, 201]:
-            if "data" in data:
-                result = data["data"]
-            else:
-                result = data
+            data = response.json()
+            result = data.get("data", data)
             
             return {
                 "reference": result.get("reference"),
@@ -98,13 +146,16 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
                 "status": result.get("status"),
             }
         else:
-            print(f"❌ Erreur: {data}")
-            raise Exception(f"Genius Pay erreur {response.status_code}: {data}")
+            error_text = response.text if response.text else "Erreur inconnue"
+            print(f"❌ Erreur: {error_text}")
+            raise Exception(f"Genius Pay erreur {response.status_code}: {error_text}")
             
     except requests.exceptions.RequestException as e:
         print(f"❌ Erreur Request: {e}")
+        if hasattr(e, 'response') and e.response:
+            print(f"📄 Réponse: {e.response.text[:200]}")
         raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
-    
+
 
 def get_genius_pay_payment(config, reference):
     """Récupère le statut d'un paiement."""

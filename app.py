@@ -110,6 +110,8 @@ def require_active_subscription(f):
 # ---------------------------------------------------------------------------
 # AUTH
 # ---------------------------------------------------------------------------
+# app.py - Dans la route register
+
 @app.route("/api/auth/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -119,18 +121,15 @@ def register():
     if User.query.filter_by(email=data["email"]).first():
         return jsonify({"error": "Cet email est deja utilise"}), 409
 
-    # ✅ Récupérer le pays depuis la requête
-    country = data.get("country", "FR")  # Par défaut "FR"
-    
-    # ✅ Si le pays est un nom complet, le convertir en code
-    if len(country) > 2:
-        country = get_country_code(country)  # Utiliser la fonction de conversion
+    # ✅ Récupérer le téléphone
+    phone = data.get("phone", "")
 
     user = User(
         full_name=data["full_name"],
         email=data["email"],
+        phone=phone,  # ← AJOUTER
         profile_type=data.get("profile_type", "etudiant"),
-        country=country,  # ✅ Ajouter le pays
+        country=data.get("country", "CI"),
     )
     user.set_password(data["password"])
     db.session.add(user)
