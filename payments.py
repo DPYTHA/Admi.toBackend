@@ -1,19 +1,32 @@
+
+
+# ---------------------------------------------------------------------------
+# GENIUS PAY
+# ---------------------------------------------------------------------------
 """
 Module de paiement pour Admi.To.
 """
 import requests
 import hmac
 import hashlib
-import urllib3 
+import urllib3
+import json
 from datetime import datetime, timedelta
-import json  
-# Désactiver les avertissements SSL
+import os
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# ✅ Variable pour contrôler les logs de débogage
+DEBUG = os.environ.get("PAYMENT_DEBUG", "False").lower() == "true"
 
-# ---------------------------------------------------------------------------
-# GENIUS PAY
-# ---------------------------------------------------------------------------
+def log_debug(message, data=None):
+    """Log seulement si DEBUG est activé"""
+    if DEBUG:
+        if data:
+            print(f"🔍 {message}: {data}")
+        else:
+            print(f"🔍 {message}")
+
 def create_genius_pay_payment(config, amount, currency, user, subscription_id):
     """
     Crée une transaction Genius Pay.
@@ -24,6 +37,7 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         "X-API-Key": config.GENIUS_PAY_API_KEY,
         "X-API-Secret": config.GENIUS_PAY_API_SECRET,
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
     
     customer_country = user.country or "France"
@@ -45,40 +59,31 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
         },
     }
 
-    print(f"💰 Envoi à Genius Pay: {url}")
-    print(f"   Montant: {amount} {currency}")
-    print(f"   Utilisateur: {user.full_name}")
-    print(f"   Pays: {customer_country}")
-    
-    # ✅ Afficher le payload complet
-    print(f"📤 Payload: {json.dumps(payload, indent=2)}")
+    # ✅ Logs simplifiés (moins de caractères)
+    print(f"💰 Paiement: {amount} {currency} | Utilisateur: {user.full_name} | Pays: {customer_country}")
 
     try:
         response = requests.post(
             url, 
-            json=payload, 
+            data=json.dumps(payload), 
             headers=headers, 
             timeout=30,
             verify=False
         )
         
         print(f"📥 Status: {response.status_code}")
-        print(f"📥 Headers: {dict(response.headers)}")
         
-        # ✅ Afficher la réponse brute
         raw_response = response.text
-        print(f"📥 Réponse brute: {raw_response[:500]}")
+        if DEBUG:
+            print(f"📥 Réponse: {raw_response[:200]}...")
         
-        # ✅ Si la réponse est vide, lever une exception claire
         if not raw_response or raw_response.strip() == "":
             raise Exception("Réponse vide de Genius Pay")
         
-        # ✅ Tenter de parser le JSON
         try:
             data = response.json()
         except json.JSONDecodeError as e:
             print(f"❌ Erreur JSON: {e}")
-            print(f"📄 Contenu reçu: {raw_response}")
             raise Exception(f"Réponse non-JSON: {raw_response[:100]}")
         
         if response.status_code in [200, 201]:
@@ -98,10 +103,10 @@ def create_genius_pay_payment(config, amount, currency, user, subscription_id):
             
     except requests.exceptions.RequestException as e:
         print(f"❌ Erreur Request: {e}")
-        if hasattr(e, 'response') and e.response:
+        if hasattr(e, 'response') and e.response and DEBUG:
             print(f"📄 Réponse: {e.response.text}")
         raise Exception(f"Impossible de contacter Genius Pay: {str(e)}")
-
+    
 
 def get_genius_pay_payment(config, reference):
     """Récupère le statut d'un paiement."""
