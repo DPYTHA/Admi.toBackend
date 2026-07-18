@@ -119,23 +119,29 @@ def register():
     if User.query.filter_by(email=data["email"]).first():
         return jsonify({"error": "Cet email est deja utilise"}), 409
 
+    # ✅ Récupérer le pays depuis la requête
+    country = data.get("country", "FR")  # Par défaut "FR"
+    
+    # ✅ Si le pays est un nom complet, le convertir en code
+    if len(country) > 2:
+        country = get_country_code(country)  # Utiliser la fonction de conversion
+
     user = User(
         full_name=data["full_name"],
         email=data["email"],
         profile_type=data.get("profile_type", "etudiant"),
+        country=country,  # ✅ Ajouter le pays
     )
     user.set_password(data["password"])
     db.session.add(user)
     db.session.commit()
 
-    # Cree un abonnement inactif par defaut
     sub = Subscription(user_id=user.id, is_active=False)
     db.session.add(sub)
     db.session.commit()
 
     token = create_access_token(identity=str(user.id))
     return jsonify({"token": token, "user": user.to_dict()}), 201
-
 
 @app.route("/api/auth/login", methods=["POST"])
 def login():
