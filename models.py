@@ -4,6 +4,32 @@ import bcrypt
 
 db = SQLAlchemy()
 
+# models.py - Ajouter à la fin du fichier
+
+c# models.py - Ajouter à la fin du fichier
+
+class PushToken(db.Model):
+    """Token de notification push pour Expo."""
+    __tablename__ = "push_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    platform = db.Column(db.String(20), default="unknown")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship("User", back_populates="push_tokens")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "token": self.token[:10] + "...",  # Masquer le token
+            "platform": self.platform,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+    
 
 class User(db.Model):
     __tablename__ = "users"
@@ -18,7 +44,7 @@ class User(db.Model):
     currency = db.Column(db.String(10), default="EUR")  # devise locale du client (XOF, XAF, CAD, ...)
     account_status = db.Column(db.String(20), default="inactive")  # inactive / active
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    push_tokens = db.relationship("PushToken", back_populates="user")
     subscription = db.relationship("Subscription", uselist=False, back_populates="user")
     applications = db.relationship("Application", back_populates="user")
 

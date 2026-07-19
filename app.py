@@ -1,9 +1,11 @@
 import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from models import db, User, Offer, Application, Subscription, PaymentEvent, PushToken
 from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required, get_jwt_identity,
     verify_jwt_in_request, get_jwt
+    
 )
 from datetime import datetime
 from functools import wraps
@@ -105,7 +107,6 @@ def require_active_subscription(f):
             }), 402
         return f(*args, **kwargs)
     return wrapper
-
 
 # ---------------------------------------------------------------------------
 # AUTH
@@ -383,7 +384,23 @@ def create_offer():
     )
     db.session.add(offer)
     db.session.commit()
+    
+    # ✅ ENVOYER LES NOTIFICATIONS EN ARRIÈRE-PLAN
+    try:
+        from services.notifications import notify_users_about_new_offer
+        import threading
+        threading.Thread(
+            target=notify_users_about_new_offer,
+            args=(offer,)
+        ).start()
+        print(f"📨 Notification envoyée pour l'offre {offer.id}")
+    except ImportError as e:
+        print(f"⚠️ Module notifications non trouvé: {e}")
+    except Exception as e:
+        print(f"❌ Erreur envoi notification: {e}")
+    
     return jsonify(offer.to_dict()), 201
+
 
 
 @app.route("/api/admin/offers", methods=["GET"])
@@ -860,6 +877,46 @@ def reset_password():
     db.session.commit()
     
     return jsonify({"message": "Mot de passe réinitialisé"}), 200
+
+# app.py - Ajouter ces routes
+
+# ===== NOTIFICATIONS PUSH =====
+
+@app.route("/api/push/register", methods=["POST"])
+@jwt_required()
+def register_push_token():
+    """Enregistre le token push de l'utilisateur"""
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    token = data.get("token")
+    platform = data.get("platform", "unknown")
+    
+    if not token:
+        return jsonify({"error": "Token requis"}), 400
+    
+    # Supprimer l'ancien token s'il existe
+    PushToken.query.filter_by(token=token).delete()
+    
+    # Créer le nouveau token
+    push_token = PushToken(
+        user_id=user_id,
+        token=token,
+        platform=platform
+    )
+    db.session.add(push_token)
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Token enregistré"}), 200
+
+@app.route("/api/push/tokens", methods=["GET"])
+@jwt_required()
+def get_push_tokens():
+    """Récupère les tokens de l'utilisateur"""
+    user_id = get_jwt_identity()
+    tokens = PushToken.query.filter_by(user_id=user_id).all()
+    return jsonify([t.to_dict() for t in tokens]), 200
+
+
 # ---------------------------------------------------------------------------
 # PRODUCTION ENTRY POINT
 # ---------------------------------------------------------------------------
