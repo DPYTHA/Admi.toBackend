@@ -279,3 +279,32 @@ def capture_paypal_order(config, order_id):
 
 def compute_next_period_end():
     return datetime.utcnow() + timedelta(days=30)
+
+
+# payments.py
+
+def verify_genius_pay_payment(config, reference):
+    """Vérifie qu'un paiement est confirmé."""
+    try:
+        url = f"{config.GENIUS_PAY_API_URL}/payments/{reference}"
+        headers = {
+            "X-API-Key": config.GENIUS_PAY_API_KEY,
+            "X-API-Secret": config.GENIUS_PAY_API_SECRET,
+        }
+        response = requests.get(url, headers=headers, timeout=30, verify=False)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "data" in data:
+                result = data["data"]
+            else:
+                result = data
+            status = result.get("status")
+            print(f"🔍 Statut paiement: {status}")
+            return status in ["completed", "success", "approved"]
+        else:
+            print(f"❌ Erreur vérification: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return False

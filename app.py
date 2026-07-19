@@ -553,13 +553,12 @@ def confirm_genius_pay():
                     "subscription": sub.to_dict()
                 }), 200
         except Exception as e:
-            print(f"❌ Erreur vérification paiement: {e}")
+            print(f"❌ Erreur vérification: {e}")
 
     return jsonify({
         "error": "Paiement pas encore confirmé.",
         "subscription": sub.to_dict() if sub else None,
     }), 402
-
     
 @app.route("/api/payment/webhook", methods=["POST"])
 def genius_pay_webhook():
