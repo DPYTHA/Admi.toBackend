@@ -494,8 +494,6 @@ def get_subscription():
 
 
 # app.py - Dans la route /api/subscription/pay/genius-pay
-# app.py - Dans pay_with_genius_pay, réduire les logs
-
 @app.route("/api/subscription/pay/genius-pay", methods=["POST"])
 @jwt_required()
 def pay_with_genius_pay():
@@ -509,8 +507,10 @@ def pay_with_genius_pay():
         currency = "EUR"
 
     try:
-        # ✅ Log simplifié
-        print(f"💰 Paiement pour user {user_id}: {Config.SUBSCRIPTION_PRICE_EUR} {currency}")
+        print(f"💰 Création paiement Genius Pay pour user {user_id}")
+        print(f"   Montant: {Config.SUBSCRIPTION_PRICE_EUR} {currency}")
+        print(f"   Pays: {user.country}")
+        print(f"   Téléphone: {getattr(user, 'phone', 'Non défini')}")
         
         result = payments.create_genius_pay_payment(
             Config, 
@@ -520,10 +520,10 @@ def pay_with_genius_pay():
             sub.id
         )
         
-        print(f"✅ Paiement créé: {result.get('reference')}")
+        print(f"✅ Paiement créé: {result}")
         
     except Exception as e:
-        print(f"❌ Erreur: {str(e)[:100]}")
+        print(f"❌ Erreur Genius Pay: {e}")
         return jsonify({"error": f"Impossible de contacter Genius Pay: {str(e)}"}), 502
 
     sub.provider = "genius_pay"
