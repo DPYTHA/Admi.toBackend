@@ -6,8 +6,6 @@ db = SQLAlchemy()
 
 # models.py - Ajouter à la fin du fichier
 
-c# models.py - Ajouter à la fin du fichier
-
 class PushToken(db.Model):
     """Token de notification push pour Expo."""
     __tablename__ = "push_tokens"
