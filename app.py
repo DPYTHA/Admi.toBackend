@@ -385,14 +385,17 @@ def create_offer():
     db.session.add(offer)
     db.session.commit()
     
-    # ✅ ENVOYER LES NOTIFICATIONS EN ARRIÈRE-PLAN
+   # ✅ ENVOYER LES NOTIFICATIONS DANS LE CONTEXTE
     try:
         from services.notifications import notify_users_about_new_offer
         import threading
-        threading.Thread(
-            target=notify_users_about_new_offer,
-            args=(offer,)
-        ).start()
+        
+        # ✅ Démarrer le thread avec l'app_context
+        def send_with_context():
+            with app.app_context():
+                notify_users_about_new_offer(offer)
+        
+        threading.Thread(target=send_with_context).start()
         print(f"📨 Notification envoyée pour l'offre {offer.id}")
     except ImportError as e:
         print(f"⚠️ Module notifications non trouvé: {e}")
